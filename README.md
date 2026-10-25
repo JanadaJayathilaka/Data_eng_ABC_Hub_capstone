@@ -42,7 +42,7 @@ The project integrates data from **three distinct source systems**:
 
 ## 🚀 Bronze Layer Loading
 
-The Bronze layer ingests raw data as-is with ingestion metadata (`load_timestamp`).
+The Bronze layer ingests raw data as-is from the raw tables.
 
 * **DDL Definition**: `dags/sql/bronze/00_create_bronze_schema_and_tables.sql`
 * **Full Load Queries**: `dags/sql/bronze/full_load/*.sql`

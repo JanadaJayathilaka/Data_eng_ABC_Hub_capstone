@@ -1,4 +1,2 @@
-SELECT
-    *,
-    CURRENT_TIMESTAMP AS load_timestamp
+SELECT *
 FROM pulsetrack_raw.conversion_touchpoints_raw;
