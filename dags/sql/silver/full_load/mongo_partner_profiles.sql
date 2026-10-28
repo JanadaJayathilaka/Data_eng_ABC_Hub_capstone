@@ -1,0 +1,1 @@
+-- DEPRECATED: Partner profiles are integrated directly into pulsetrack_silver.partners

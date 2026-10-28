@@ -1,0 +1,1 @@
+-- DEPRECATED: Kafka conversion stream is processed in Gold / stream replay
