@@ -1,19 +1,29 @@
-WITH deduplicated AS (
+WITH cleaned AS (
     SELECT
-        TRIM(touchpoint_id) AS touchpoint_id,
-        TRIM(conversion_id) AS conversion_id,
-        TRIM(click_id) AS click_id,
-        LOWER(TRIM(touch_position)) AS touch_position,
+        NULLIF(TRIM(touchpoint_id), '') AS touchpoint_id,
+        NULLIF(TRIM(conversion_id), '') AS conversion_id,
+        NULLIF(TRIM(click_id), '') AS click_id,
+        LOWER(NULLIF(TRIM(touch_position), '')) AS touch_position,
         pulsetrack_silver.parse_money(weight) AS weight,
         pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at,
-        ROW_NUMBER() OVER (
-            PARTITION BY TRIM(touchpoint_id)
-            ORDER BY pulsetrack_silver.parse_timestamp(updated_at) DESC NULLS LAST
-        ) AS rn
+        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+
     FROM pulsetrack_bronze.conversion_touchpoints
-    WHERE TRIM(touchpoint_id) IS NOT NULL AND TRIM(touchpoint_id) != ''
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY touchpoint_id
+            ORDER BY
+                updated_at DESC NULLS LAST,
+                created_at DESC NULLS LAST
+        ) AS rn
+    FROM cleaned
+    WHERE touchpoint_id IS NOT NULL
 )
+
 SELECT
     touchpoint_id,
     conversion_id,

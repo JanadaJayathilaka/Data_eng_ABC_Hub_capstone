@@ -36,7 +36,9 @@ combined AS (
         COALESCE(b.updated_at, m.updated_at) AS updated_at,
         ROW_NUMBER() OVER (
             PARTITION BY COALESCE(b.partner_id, m.partner_id)
-            ORDER BY COALESCE(b.updated_at, m.updated_at) DESC NULLS LAST
+            ORDER BY
+                COALESCE(b.updated_at, m.updated_at) DESC NULLS LAST,
+                COALESCE(b.created_at, m.created_at) DESC NULLS LAST
         ) AS rn
     FROM bronze_partners b
     FULL OUTER JOIN mongo_partners m ON b.partner_id = m.partner_id

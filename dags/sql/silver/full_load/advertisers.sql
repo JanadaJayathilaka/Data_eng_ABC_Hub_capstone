@@ -1,21 +1,32 @@
-WITH deduplicated AS (
+WITH cleaned AS (
     SELECT
-        TRIM(advertiser_id) AS advertiser_id,
-        TRIM(advertiser_name) AS advertiser_name,
-        TRIM(vertical) AS vertical,
+        NULLIF(TRIM(advertiser_id), '') AS advertiser_id,
+        COALESCE(NULLIF(TRIM(advertiser_name), ''), 'Unknown Advertiser') AS advertiser_name,
+        NULLIF(TRIM(vertical), '') AS vertical,
         NULLIF(TRIM(account_manager_id), '') AS account_manager_id,
-        LOWER(TRIM(status)) AS status,
+        LOWER(NULLIF(TRIM(status), '')) AS status,
+
         pulsetrack_silver.parse_date(signup_date) AS signup_date,
         pulsetrack_silver.parse_country(billing_country) AS billing_country,
         pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at,
-        ROW_NUMBER() OVER (
-            PARTITION BY TRIM(advertiser_id)
-            ORDER BY pulsetrack_silver.parse_timestamp(updated_at) DESC NULLS LAST
-        ) AS rn
+        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+
     FROM pulsetrack_bronze.advertisers
-    WHERE TRIM(advertiser_id) IS NOT NULL AND TRIM(advertiser_id) != ''
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY advertiser_id
+            ORDER BY
+                updated_at DESC NULLS LAST,
+                created_at DESC NULLS LAST
+        ) AS rn
+    FROM cleaned
+    WHERE advertiser_id IS NOT NULL
 )
+
 SELECT
     advertiser_id,
     advertiser_name,

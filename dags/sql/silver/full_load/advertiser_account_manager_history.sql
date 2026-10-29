@@ -1,1 +1,0 @@
--- DEPRECATED: Table replaced by mongo_advertiser_accounts.sql

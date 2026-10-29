@@ -385,3 +385,37 @@ CREATE TABLE IF NOT EXISTS pulsetrack_silver.mongo_advertiser_accounts (
     updated_at      TIMESTAMP,
     PRIMARY KEY (advertiser_id, am_id, valid_from)
 );
+
+-- 13. mongo_partner_profiles (Parsed profiles extracted from MongoDB)
+CREATE TABLE IF NOT EXISTS pulsetrack_silver.mongo_partner_profiles (
+    partner_id      VARCHAR(10) PRIMARY KEY,
+    partner_name    VARCHAR(150),
+    contact_person  VARCHAR(100),
+    contact_email   VARCHAR(150),
+    contact_phone   VARCHAR(50),
+    primary_channel VARCHAR(50),
+    payment_terms   VARCHAR(50),
+    min_payout      NUMERIC(10, 2),
+    payment_method  VARCHAR(50),
+    joined_at       DATE,
+    created_at      TIMESTAMP,
+    updated_at      TIMESTAMP
+);
+
+-- 14. kafka_pulsetrack_conversions (Deduplicated event stream from Kafka)
+CREATE TABLE IF NOT EXISTS pulsetrack_silver.kafka_pulsetrack_conversions (
+    event_id           VARCHAR(50) PRIMARY KEY,
+    event_type         VARCHAR(50),
+    conversion_id      VARCHAR(20),
+    campaign_id        VARCHAR(10),
+    partner_id         VARCHAR(10),
+    click_id           VARCHAR(20),
+    revenue            NUMERIC(12, 2),
+    payout             NUMERIC(12, 2),
+    currency           VARCHAR(10),
+    status             VARCHAR(20),
+    occurred_at        TIMESTAMP,
+    partition_id       INTEGER,
+    offset_id          BIGINT,
+    message_timestamp  TIMESTAMP
+);

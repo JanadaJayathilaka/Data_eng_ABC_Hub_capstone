@@ -1,20 +1,30 @@
-WITH deduplicated AS (
+WITH cleaned AS (
     SELECT
-        TRIM(creative_id) AS creative_id,
-        TRIM(campaign_id) AS campaign_id,
-        TRIM(creative_name) AS creative_name,
-        TRIM(format) AS format,
-        TRIM(size) AS size,
-        TRIM(landing_url) AS landing_url,
+        NULLIF(TRIM(creative_id), '') AS creative_id,
+        NULLIF(TRIM(campaign_id), '') AS campaign_id,
+        NULLIF(TRIM(creative_name), '') AS creative_name,
+        NULLIF(TRIM(format), '') AS format,
+        NULLIF(TRIM(size), '') AS size,
+        NULLIF(TRIM(landing_url), '') AS landing_url,
         pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at,
-        ROW_NUMBER() OVER (
-            PARTITION BY TRIM(creative_id)
-            ORDER BY pulsetrack_silver.parse_timestamp(updated_at) DESC NULLS LAST
-        ) AS rn
+        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+
     FROM pulsetrack_bronze.creatives
-    WHERE TRIM(creative_id) IS NOT NULL AND TRIM(creative_id) != ''
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY creative_id
+            ORDER BY
+                updated_at DESC NULLS LAST,
+                created_at DESC NULLS LAST
+        ) AS rn
+    FROM cleaned
+    WHERE creative_id IS NOT NULL
 )
+
 SELECT
     creative_id,
     campaign_id,

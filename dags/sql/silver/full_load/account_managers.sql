@@ -1,19 +1,30 @@
-WITH deduplicated AS (
+WITH cleaned AS (
     SELECT
-        TRIM(am_id) AS am_id,
+        NULLIF(TRIM(am_id), '') AS am_id,
         NULLIF(TRIM(am_name), '') AS am_name,
-        TRIM(team) AS team,
-        TRIM(region) AS region,
+        NULLIF(TRIM(team), '') AS team,
+        NULLIF(TRIM(region), '') AS region,
+
         pulsetrack_silver.parse_date(hire_date) AS hire_date,
         pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at,
-        ROW_NUMBER() OVER (
-            PARTITION BY TRIM(am_id)
-            ORDER BY pulsetrack_silver.parse_timestamp(updated_at) DESC NULLS LAST
-        ) AS rn
+        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+
     FROM pulsetrack_bronze.account_managers
-    WHERE TRIM(am_id) IS NOT NULL AND TRIM(am_id) != ''
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY am_id
+            ORDER BY
+                updated_at DESC NULLS LAST,
+                created_at DESC NULLS LAST
+        ) AS rn
+    FROM cleaned
+    WHERE am_id IS NOT NULL
 )
+
 SELECT
     am_id,
     am_name,

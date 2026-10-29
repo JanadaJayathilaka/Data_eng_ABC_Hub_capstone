@@ -177,6 +177,15 @@ with DAG(
         },
     )
 
+    load_mongo_partner_profiles = PythonOperator(
+        task_id="load_silver_mongo_partner_profiles",
+        python_callable=load_silver_table,
+        op_kwargs={
+            "sql_file": "full_load/mongo_partner_profiles.sql",
+            "target_table": "pulsetrack_silver.mongo_partner_profiles",
+        },
+    )
+
     # 2. Funnel Events & Facts
     load_impressions = PythonOperator(
         task_id="load_silver_impressions",
@@ -223,6 +232,15 @@ with DAG(
         },
     )
 
+    load_kafka_pulsetrack_conversions = PythonOperator(
+        task_id="load_silver_kafka_pulsetrack_conversions",
+        python_callable=load_silver_table,
+        op_kwargs={
+            "sql_file": "full_load/kafka_pulsetrack_conversions.sql",
+            "target_table": "pulsetrack_silver.kafka_pulsetrack_conversions",
+        },
+    )
+
     end = EmptyOperator(
         task_id="end",
         outlets=outlets,
@@ -240,6 +258,7 @@ with DAG(
         load_campaigns,
         load_creatives,
         load_mongo_advertiser_accounts,
+        load_mongo_partner_profiles,
     ]
 
     fact_tasks = [
@@ -248,6 +267,7 @@ with DAG(
         load_conversions,
         load_conversion_touchpoints,
         load_revenue_adjustments,
+        load_kafka_pulsetrack_conversions,
     ]
 
     start >> init_silver_schema >> dimension_tasks >> fact_tasks >> end

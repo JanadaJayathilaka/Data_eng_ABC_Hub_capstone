@@ -1,20 +1,30 @@
-WITH deduplicated AS (
+WITH cleaned AS (
     SELECT
-        TRIM(offer_id) AS offer_id,
-        TRIM(offer_name) AS offer_name,
-        TRIM(advertiser_id) AS advertiser_id,
-        TRIM(vertical) AS vertical,
+        NULLIF(TRIM(offer_id), '') AS offer_id,
+        NULLIF(TRIM(offer_name), '') AS offer_name,
+        NULLIF(TRIM(advertiser_id), '') AS advertiser_id,
+        NULLIF(TRIM(vertical), '') AS vertical,
         pulsetrack_silver.parse_money(default_payout) AS default_payout,
-        UPPER(TRIM(payout_type)) AS payout_type,
+        UPPER(NULLIF(TRIM(payout_type), '')) AS payout_type,
         pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at,
-        ROW_NUMBER() OVER (
-            PARTITION BY TRIM(offer_id)
-            ORDER BY pulsetrack_silver.parse_timestamp(updated_at) DESC NULLS LAST
-        ) AS rn
+        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+
     FROM pulsetrack_bronze.offers
-    WHERE TRIM(offer_id) IS NOT NULL AND TRIM(offer_id) != ''
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY offer_id
+            ORDER BY
+                updated_at DESC NULLS LAST,
+                created_at DESC NULLS LAST
+        ) AS rn
+    FROM cleaned
+    WHERE offer_id IS NOT NULL
 )
+
 SELECT
     offer_id,
     offer_name,

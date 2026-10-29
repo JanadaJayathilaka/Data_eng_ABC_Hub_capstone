@@ -1,19 +1,29 @@
-WITH deduplicated AS (
+WITH cleaned AS (
     SELECT
-        TRIM(adjustment_id) AS adjustment_id,
-        TRIM(conversion_id) AS conversion_id,
+        NULLIF(TRIM(adjustment_id), '') AS adjustment_id,
+        NULLIF(TRIM(conversion_id), '') AS conversion_id,
         pulsetrack_silver.parse_money(delta_amount) AS delta_amount,
-        TRIM(reason) AS reason,
+        NULLIF(TRIM(reason), '') AS reason,
         pulsetrack_silver.parse_timestamp(adjusted_at) AS adjusted_at,
         pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at,
-        ROW_NUMBER() OVER (
-            PARTITION BY TRIM(adjustment_id)
-            ORDER BY pulsetrack_silver.parse_timestamp(updated_at) DESC NULLS LAST
-        ) AS rn
+        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+
     FROM pulsetrack_bronze.revenue_adjustments
-    WHERE TRIM(adjustment_id) IS NOT NULL AND TRIM(adjustment_id) != ''
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY adjustment_id
+            ORDER BY
+                updated_at DESC NULLS LAST,
+                created_at DESC NULLS LAST
+        ) AS rn
+    FROM cleaned
+    WHERE adjustment_id IS NOT NULL
 )
+
 SELECT
     adjustment_id,
     conversion_id,
