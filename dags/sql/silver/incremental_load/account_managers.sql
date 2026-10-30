@@ -1,0 +1,39 @@
+WITH cleaned AS (
+    SELECT
+        NULLIF(TRIM(am_id), '') AS am_id,
+        NULLIF(TRIM(am_name), '') AS am_name,
+        NULLIF(TRIM(team), '') AS team,
+        NULLIF(TRIM(region), '') AS region,
+
+        pulsetrack_silver.parse_date(hire_date) AS hire_date,
+        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
+        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+
+    FROM pulsetrack_bronze.account_managers
+    WHERE pulsetrack_silver.parse_timestamp(updated_at) > '{{ last_watermark }}'::TIMESTAMP
+       OR pulsetrack_silver.parse_timestamp(created_at) > '{{ last_watermark }}'::TIMESTAMP
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY am_id
+            ORDER BY
+                updated_at DESC NULLS LAST,
+                created_at DESC NULLS LAST
+        ) AS rn
+    FROM cleaned
+    WHERE am_id IS NOT NULL
+)
+
+SELECT
+    am_id,
+    am_name,
+    team,
+    region,
+    hire_date,
+    created_at,
+    updated_at
+FROM deduplicated
+WHERE rn = 1;

@@ -23,7 +23,7 @@ except Exception:
     schedule = None
     outlets = []
 
-from utils.database import extract_data, get_connection, load_data, truncate_table
+from utils.database import extract_data, load_data, truncate_table
 from utils.file import read_sql
 
 
@@ -40,22 +40,6 @@ SQL_DIR = BASE_DIR / "sql" / "silver"
 # --------------------------------------------------------------------
 # Helper Tasks
 # --------------------------------------------------------------------
-
-def create_silver_schema_and_tables():
-    """Ensure pulsetrack_silver schema, parsing functions, and tables exist."""
-    ddl_file = SQL_DIR / "00_create_silver_schema_and_tables.sql"
-    if ddl_file.exists():
-        sql = read_sql(ddl_file)
-        conn = get_connection(TARGET_CONN)
-        cursor = conn.cursor()
-        cursor.execute(sql)
-        conn.commit()
-        cursor.close()
-        conn.close()
-        print("Silver schema, helper functions, and tables verified/created successfully.")
-    else:
-        print(f"DDL file {ddl_file} not found; skipping schema setup.")
-
 
 def load_silver_table(sql_file: str, target_table: str):
     """Generic full load function: extract from bronze, clean/transform, truncate silver, and insert."""
@@ -106,11 +90,6 @@ with DAG(
 
     start = EmptyOperator(
         task_id="start"
-    )
-
-    init_silver_schema = PythonOperator(
-        task_id="create_silver_schema_and_tables",
-        python_callable=create_silver_schema_and_tables,
     )
 
     # 1. Dimensions / Reference Entities
@@ -247,27 +226,33 @@ with DAG(
     )
 
     # --------------------------------------------------------------
-    # Task Dependencies
+    # Task Dependencies (Organized by Referential & Funnel Hierarchy)
     # --------------------------------------------------------------
 
-    dimension_tasks = [
-        load_account_managers,
-        load_advertisers,
-        load_partners,
-        load_offers,
-        load_campaigns,
-        load_creatives,
-        load_mongo_advertiser_accounts,
-        load_mongo_partner_profiles,
-    ]
+    # 1. Dimension Hierarchy:
+    # Snowflake chain: account_managers -> advertisers -> offers -> campaigns -> creatives
+    start >> load_account_managers >> load_advertisers >> load_offers >> load_campaigns >> load_creatives
 
-    fact_tasks = [
-        load_impressions,
-        load_clicks,
-        load_conversions,
+    # MongoDB CRM Dimensions
+    start >> load_mongo_advertiser_accounts
+    start >> load_mongo_partner_profiles >> load_partners
+
+    # 2. Funnel Top: Impressions (depends on campaigns, creatives, and conformed partners)
+    [load_creatives, load_partners] >> load_impressions
+
+    # 3. Funnel Middle: Clicks (enriches missing attributes & timestamps from impressions)
+    load_impressions >> load_clicks
+
+    # 4. Funnel Bottom & Event Streams: Conversions and Kafka conversions
+    load_clicks >> [load_conversions, load_kafka_pulsetrack_conversions]
+
+    # 5. Conversion Downstream: Multi-touch attribution touchpoints & revenue adjustments
+    load_conversions >> [load_conversion_touchpoints, load_revenue_adjustments]
+
+    # 6. Pipeline Completion
+    [
         load_conversion_touchpoints,
         load_revenue_adjustments,
         load_kafka_pulsetrack_conversions,
-    ]
-
-    start >> init_silver_schema >> dimension_tasks >> fact_tasks >> end
+        load_mongo_advertiser_accounts,
+    ] >> end

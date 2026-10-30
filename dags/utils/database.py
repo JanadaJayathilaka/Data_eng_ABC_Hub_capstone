@@ -91,3 +91,63 @@ def load_data(
     conn.commit()
     cursor.close()
     conn.close()
+
+
+def upsert_data(
+    conn_id: str,
+    table_name: str,
+    columns: list,
+    rows: list,
+    conflict_columns: list,
+):
+    """Idempotent UPSERT into target table using ON CONFLICT DO UPDATE / DO NOTHING."""
+    if not rows:
+        print(f"No rows to upsert into {table_name}")
+        return
+
+    conn = get_connection(conn_id)
+    cursor = conn.cursor()
+
+    placeholders = ",".join(["%s"] * len(columns))
+    column_names = ",".join(columns)
+    conflict_target = ",".join(conflict_columns)
+
+    update_cols = [c for c in columns if c not in conflict_columns]
+
+    if update_cols:
+        updates = ", ".join([f"{col} = EXCLUDED.{col}" for col in update_cols])
+        sql = f"""
+            INSERT INTO {table_name} ({column_names})
+            VALUES ({placeholders})
+            ON CONFLICT ({conflict_target})
+            DO UPDATE SET {updates}
+        """
+    else:
+        sql = f"""
+            INSERT INTO {table_name} ({column_names})
+            VALUES ({placeholders})
+            ON CONFLICT ({conflict_target})
+            DO NOTHING
+        """
+
+    # Check if rows contain dict/list (e.g. JSONB columns) and wrap with Jsonb adapter
+    has_json = False
+    for row in rows[:100]:
+        if any(isinstance(v, (dict, list)) for v in row):
+            has_json = True
+            break
+
+    if has_json:
+        prepared_rows = [
+            tuple(Jsonb(v) if isinstance(v, (dict, list)) else v for v in row)
+            for row in rows
+        ]
+    else:
+        prepared_rows = rows
+
+    cursor.executemany(sql, prepared_rows)
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print(f"Upserted {len(rows)} rows into {table_name}")
+

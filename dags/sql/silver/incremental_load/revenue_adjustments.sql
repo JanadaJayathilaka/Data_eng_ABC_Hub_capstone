@@ -1,0 +1,38 @@
+WITH cleaned AS (
+    SELECT
+        NULLIF(TRIM(adjustment_id), '') AS adjustment_id,
+        NULLIF(TRIM(conversion_id), '') AS conversion_id,
+        pulsetrack_silver.parse_money(delta_amount) AS delta_amount,
+        NULLIF(TRIM(reason), '') AS reason,
+        pulsetrack_silver.parse_timestamp(adjusted_at) AS adjusted_at,
+        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
+        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+
+    FROM pulsetrack_bronze.revenue_adjustments
+    WHERE pulsetrack_silver.parse_timestamp(updated_at) > '{{ last_watermark }}'::TIMESTAMP
+       OR pulsetrack_silver.parse_timestamp(created_at) > '{{ last_watermark }}'::TIMESTAMP
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY adjustment_id
+            ORDER BY
+                updated_at DESC NULLS LAST,
+                created_at DESC NULLS LAST
+        ) AS rn
+    FROM cleaned
+    WHERE adjustment_id IS NOT NULL
+)
+
+SELECT
+    adjustment_id,
+    conversion_id,
+    delta_amount,
+    reason,
+    adjusted_at,
+    created_at,
+    updated_at
+FROM deduplicated
+WHERE rn = 1;
