@@ -1,17 +1,48 @@
-WITH cleaned AS (
-    SELECT
-        NULLIF(TRIM(campaign_id), '') AS campaign_id,
-        NULLIF(TRIM(campaign_name), '') AS campaign_name,
+WITH bronze_offers AS (
+    SELECT DISTINCT
         NULLIF(TRIM(offer_id), '') AS offer_id,
-        NULLIF(TRIM(advertiser_id), '') AS advertiser_id,
-        UPPER(NULLIF(TRIM(price_type), '')) AS price_type,
+        NULLIF(TRIM(advertiser_id), '') AS advertiser_id
+    FROM pulsetrack_bronze.offers
+    WHERE NULLIF(TRIM(offer_id), '') IS NOT NULL
+),
 
-        pulsetrack_silver.parse_date(start_date) AS start_date,
-        pulsetrack_silver.parse_date(end_date) AS end_date,
-        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+bronze_advertisers AS (
+    SELECT DISTINCT NULLIF(TRIM(advertiser_id), '') AS advertiser_id
+    FROM pulsetrack_bronze.advertisers
+    WHERE NULLIF(TRIM(advertiser_id), '') IS NOT NULL
+),
 
-    FROM pulsetrack_bronze.campaigns
+cleaned AS (
+    SELECT
+        NULLIF(TRIM(c.campaign_id), '') AS campaign_id,
+        NULLIF(TRIM(c.campaign_name), '') AS campaign_name,
+
+        -- Referential integrity check on offer_id
+        CASE 
+            WHEN o.offer_id IS NOT NULL THEN NULLIF(TRIM(c.offer_id), '')
+            ELSE NULL 
+        END AS offer_id,
+
+        -- Referential integrity & orphan resolution:
+        -- If campaign's advertiser_id is in advertisers, keep it.
+        -- If it's an invalid orphan, recover the valid advertiser from the linked offer.
+        COALESCE(adv.advertiser_id, o_adv.advertiser_id) AS advertiser_id,
+
+        -- Standardize price_type to lowercase and trimmed ('cpa', 'cpc', 'cpm', 'fixed')
+        LOWER(NULLIF(TRIM(c.price_type), '')) AS price_type,
+
+        pulsetrack_silver.parse_date(c.start_date) AS start_date,
+        pulsetrack_silver.parse_date(c.end_date) AS end_date,
+        pulsetrack_silver.parse_timestamp(c.created_at) AS created_at,
+        pulsetrack_silver.parse_timestamp(c.updated_at) AS updated_at
+
+    FROM pulsetrack_bronze.campaigns c
+    LEFT JOIN bronze_offers o 
+           ON NULLIF(TRIM(c.offer_id), '') = o.offer_id
+    LEFT JOIN bronze_advertisers adv 
+           ON NULLIF(TRIM(c.advertiser_id), '') = adv.advertiser_id
+    LEFT JOIN bronze_advertisers o_adv
+           ON o.advertiser_id = o_adv.advertiser_id
 ),
 
 deduplicated AS (

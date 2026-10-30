@@ -1,17 +1,30 @@
-WITH cleaned AS (
+WITH bronze_am AS (
+    SELECT DISTINCT NULLIF(TRIM(am_id), '') AS am_id
+    FROM pulsetrack_bronze.account_managers
+    WHERE NULLIF(TRIM(am_id), '') IS NOT NULL
+),
+
+cleaned AS (
     SELECT
-        NULLIF(TRIM(advertiser_id), '') AS advertiser_id,
-        COALESCE(NULLIF(TRIM(advertiser_name), ''), 'Unknown Advertiser') AS advertiser_name,
-        NULLIF(TRIM(vertical), '') AS vertical,
-        NULLIF(TRIM(account_manager_id), '') AS account_manager_id,
-        LOWER(NULLIF(TRIM(status), '')) AS status,
+        NULLIF(TRIM(adv.advertiser_id), '') AS advertiser_id,
+        COALESCE(NULLIF(TRIM(adv.advertiser_name), ''), 'Unknown Advertiser') AS advertiser_name,
+        NULLIF(TRIM(adv.vertical), '') AS vertical,
+        
+        -- Referential integrity check: only keep valid account_manager_id, otherwise NULL
+        CASE 
+            WHEN am.am_id IS NOT NULL THEN NULLIF(TRIM(adv.account_manager_id), '')
+            ELSE NULL 
+        END AS account_manager_id,
+        
+        LOWER(NULLIF(TRIM(adv.status), '')) AS status,
+        pulsetrack_silver.parse_date(adv.signup_date) AS signup_date,
+        pulsetrack_silver.parse_country(adv.billing_country) AS billing_country,
+        pulsetrack_silver.parse_timestamp(adv.created_at) AS created_at,
+        pulsetrack_silver.parse_timestamp(adv.updated_at) AS updated_at
 
-        pulsetrack_silver.parse_date(signup_date) AS signup_date,
-        pulsetrack_silver.parse_country(billing_country) AS billing_country,
-        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
-
-    FROM pulsetrack_bronze.advertisers
+    FROM pulsetrack_bronze.advertisers adv
+    LEFT JOIN bronze_am am 
+           ON NULLIF(TRIM(adv.account_manager_id), '') = am.am_id
 ),
 
 deduplicated AS (
