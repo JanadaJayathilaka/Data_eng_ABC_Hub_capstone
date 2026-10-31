@@ -11,8 +11,8 @@ BASE_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE_DIR))
 
 from airflow import DAG
-from airflow.operators.empty import EmptyOperator
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.empty import EmptyOperator
+from airflow.providers.standard.operators.python import PythonOperator
 
 from utils.database import extract_data, load_data
 from utils.file import read_sql
@@ -44,15 +44,15 @@ def get_last_watermark(target_table: str):
     col_names = {r[0] for r in rows}
 
     if "updated_at" in col_names and "created_at" in col_names:
-        watermark_expr = "COALESCE(GREATEST(MAX(created_at::text), MAX(updated_at::text)), '1970-01-01 00:00:00')"
+        watermark_expr = "COALESCE(GREATEST(MAX(pulsetrack_silver.parse_timestamp(created_at)), MAX(pulsetrack_silver.parse_timestamp(updated_at))), '1970-01-01 00:00:00'::timestamp)::text"
     elif "extracted_at" in col_names:
-        watermark_expr = "COALESCE(MAX(extracted_at::text), '1970-01-01 00:00:00')"
+        watermark_expr = "COALESCE(MAX(extracted_at), '1970-01-01 00:00:00'::timestamp)::text"
     elif "message_timestamp" in col_names:
-        watermark_expr = "COALESCE(MAX(message_timestamp::text), '1970-01-01 00:00:00')"
+        watermark_expr = "COALESCE(MAX(message_timestamp), '1970-01-01 00:00:00'::timestamp)::text"
     elif "updated_at" in col_names:
-        watermark_expr = "COALESCE(MAX(updated_at::text), '1970-01-01 00:00:00')"
+        watermark_expr = "COALESCE(MAX(pulsetrack_silver.parse_timestamp(updated_at)), '1970-01-01 00:00:00'::timestamp)::text"
     elif "created_at" in col_names:
-        watermark_expr = "COALESCE(MAX(created_at::text), '1970-01-01 00:00:00')"
+        watermark_expr = "COALESCE(MAX(pulsetrack_silver.parse_timestamp(created_at)), '1970-01-01 00:00:00'::timestamp)::text"
     else:
         return "1970-01-01 00:00:00"
 

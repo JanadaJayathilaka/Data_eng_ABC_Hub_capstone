@@ -1,4 +1,3 @@
 SELECT *
 FROM pulsetrack_raw.conversions_raw
-WHERE created_at > '{{ last_watermark }}'
-   OR updated_at > '{{ last_watermark }}';
+WHERE COALESCE(pulsetrack_silver.parse_timestamp(updated_at), pulsetrack_silver.parse_timestamp(created_at)) > '{{ last_watermark }}'::timestamp;
