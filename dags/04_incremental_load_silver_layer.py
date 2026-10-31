@@ -35,42 +35,31 @@ def get_last_watermark(target_table: str):
     """Retrieve the high-watermark timestamp from the target Silver table."""
     schema, table = target_table.split(".")
 
-    sql = f"""
-        SELECT
-            CASE
-                WHEN EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_schema = '{schema}'
-                      AND table_name = '{table}'
-                      AND column_name = 'updated_at'
-                ) THEN (
-                    SELECT GREATEST(MAX(created_at), MAX(updated_at))::text FROM {target_table}
-                )
-                WHEN EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_schema = '{schema}'
-                      AND table_name = '{table}'
-                      AND column_name = 'message_timestamp'
-                ) THEN (
-                    SELECT MAX(message_timestamp)::text FROM {target_table}
-                )
-                ELSE NULL
-            END AS last_watermark;
+    cols_query = f"""
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = '{schema}' AND table_name = '{table}';
     """
+    _, rows = extract_data(conn_id=TARGET_CONN, sql=cols_query)
+    col_names = {r[0] for r in rows}
 
-    columns, rows = extract_data(
-        conn_id=TARGET_CONN,
-        sql=sql,
-    )
+    if "updated_at" in col_names and "created_at" in col_names:
+        watermark_expr = "COALESCE(GREATEST(MAX(created_at), MAX(updated_at)), '1970-01-01 00:00:00'::timestamp)::text"
+    elif "message_timestamp" in col_names:
+        watermark_expr = "COALESCE(MAX(message_timestamp), '1970-01-01 00:00:00'::timestamp)::text"
+    elif "updated_at" in col_names:
+        watermark_expr = "COALESCE(MAX(updated_at), '1970-01-01 00:00:00'::timestamp)::text"
+    elif "created_at" in col_names:
+        watermark_expr = "COALESCE(MAX(created_at), '1970-01-01 00:00:00'::timestamp)::text"
+    else:
+        return "1970-01-01 00:00:00"
 
-    last_watermark = rows[0][0] if rows and rows[0] else None
-
-    # Fallback if table is currently empty
-    if not last_watermark or str(last_watermark).strip() in ("", "None"):
-        last_watermark = "1970-01-01 00:00:00"
+    sql = f"SELECT {watermark_expr} AS last_watermark FROM {target_table};"
+    _, res = extract_data(conn_id=TARGET_CONN, sql=sql)
+    last_watermark = res[0][0] if res and res[0] and res[0][0] else "1970-01-01 00:00:00"
 
     print(f"Last watermark for {target_table}: {last_watermark}")
-    return last_watermark
+    return str(last_watermark)
 
 
 # --------------------------------------------------------------------

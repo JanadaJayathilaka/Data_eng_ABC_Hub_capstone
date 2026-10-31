@@ -17,16 +17,31 @@ cleaned AS (
         END AS account_manager_id,
 
         LOWER(NULLIF(TRIM(adv.status), '')) AS status,
-        pulsetrack_silver.parse_date(adv.signup_date) AS signup_date,
+        COALESCE(
+            pulsetrack_silver.parse_date(adv.signup_date),
+            (pulsetrack_silver.parse_timestamp(adv.created_at))::DATE,
+            (pulsetrack_silver.parse_timestamp(adv.updated_at))::DATE
+        ) AS signup_date,
         pulsetrack_silver.parse_country(adv.billing_country) AS billing_country,
-        pulsetrack_silver.parse_timestamp(adv.created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(adv.updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(adv.created_at),
+            (pulsetrack_silver.parse_date(adv.signup_date))::TIMESTAMP,
+            pulsetrack_silver.parse_timestamp(adv.updated_at)
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(adv.updated_at),
+            pulsetrack_silver.parse_timestamp(adv.created_at),
+            (pulsetrack_silver.parse_date(adv.signup_date))::TIMESTAMP
+        ) AS updated_at
 
     FROM pulsetrack_bronze.advertisers adv
     LEFT JOIN bronze_am am 
            ON NULLIF(TRIM(adv.account_manager_id), '') = am.am_id
-    WHERE pulsetrack_silver.parse_timestamp(adv.updated_at) > '{{ last_watermark }}'::TIMESTAMP
-       OR pulsetrack_silver.parse_timestamp(adv.created_at) > '{{ last_watermark }}'::TIMESTAMP
+    WHERE COALESCE(
+            pulsetrack_silver.parse_timestamp(adv.updated_at),
+            pulsetrack_silver.parse_timestamp(adv.created_at),
+            (pulsetrack_silver.parse_date(adv.signup_date))::TIMESTAMP
+        ) > '{{ last_watermark }}'::TIMESTAMP
 ),
 
 deduplicated AS (

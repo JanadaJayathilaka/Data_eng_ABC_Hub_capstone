@@ -5,9 +5,23 @@ WITH cleaned AS (
         NULLIF(TRIM(team), '') AS team,
         NULLIF(TRIM(region), '') AS region,
 
-        pulsetrack_silver.parse_date(hire_date) AS hire_date,
-        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_date(hire_date),
+            (pulsetrack_silver.parse_timestamp(created_at))::DATE,
+            (pulsetrack_silver.parse_timestamp(updated_at))::DATE
+        ) AS hire_date,
+
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(created_at),
+            (pulsetrack_silver.parse_date(hire_date))::TIMESTAMP,
+            pulsetrack_silver.parse_timestamp(updated_at)
+        ) AS created_at,
+
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at),
+            (pulsetrack_silver.parse_date(hire_date))::TIMESTAMP
+        ) AS updated_at
 
     FROM pulsetrack_bronze.account_managers
 ),
