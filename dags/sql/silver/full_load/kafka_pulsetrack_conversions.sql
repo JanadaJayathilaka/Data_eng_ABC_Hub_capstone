@@ -10,10 +10,16 @@ WITH cleaned AS (
         pulsetrack_silver.parse_money(event_payload->>'payout') AS payout,
         COALESCE(NULLIF(TRIM(event_payload->>'currency'), ''), 'USD') AS currency,
         pulsetrack_silver.parse_status(event_payload->>'status') AS status,
-        pulsetrack_silver.parse_timestamp(event_payload->>'occurred_at') AS occurred_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(event_payload->>'occurred_at'),
+            to_timestamp(message_timestamp / 1000.0) AT TIME ZONE 'UTC'
+        ) AS occurred_at,
         partition_id,
         offset_id,
-        to_timestamp(message_timestamp / 1000.0) AT TIME ZONE 'UTC' AS message_timestamp
+        COALESCE(
+            to_timestamp(message_timestamp / 1000.0) AT TIME ZONE 'UTC',
+            pulsetrack_silver.parse_timestamp(event_payload->>'occurred_at')
+        ) AS message_timestamp
     FROM pulsetrack_bronze.kafka_pulsetrack_conversions
     WHERE (event_payload->>'is_test' IS NULL OR LOWER(TRIM(event_payload->>'is_test')) NOT IN ('test', '1', 'true', 't', 'yes', 'y'))
 ),

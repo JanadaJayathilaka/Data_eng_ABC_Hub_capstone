@@ -70,8 +70,18 @@ cleaned AS (
         pulsetrack_silver.parse_country(c.country) AS country,
         pulsetrack_silver.parse_device(c.device) AS device,
         pulsetrack_silver.parse_boolean(c.is_unique) AS is_unique,
-        pulsetrack_silver.parse_timestamp(c.created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(c.updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(c.created_at),
+            pulsetrack_silver.parse_timestamp(c.click_time),
+            imp.impression_time,
+            pulsetrack_silver.parse_timestamp(c.updated_at)
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(c.updated_at),
+            pulsetrack_silver.parse_timestamp(c.created_at),
+            pulsetrack_silver.parse_timestamp(c.click_time),
+            imp.impression_time
+        ) AS updated_at
 
     FROM pulsetrack_bronze.clicks c
     LEFT JOIN bronze_impressions imp

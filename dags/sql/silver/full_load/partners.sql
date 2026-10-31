@@ -30,10 +30,25 @@ combined AS (
         COALESCE(b.partner_name, m.partner_name, 'Unknown Partner') AS partner_name,
         COALESCE(b.channel, m.channel) AS channel,
         COALESCE(b.media_buyer, m.media_buyer) AS media_buyer,
-        COALESCE(b.join_date, m.join_date) AS join_date,
+        COALESCE(
+            b.join_date, 
+            m.join_date, 
+            (COALESCE(b.created_at, m.created_at))::DATE, 
+            (COALESCE(b.updated_at, m.updated_at))::DATE
+        ) AS join_date,
         COALESCE(b.payment_terms, m.payment_terms) AS payment_terms,
-        COALESCE(b.created_at, m.created_at) AS created_at,
-        COALESCE(b.updated_at, m.updated_at) AS updated_at,
+        COALESCE(
+            b.created_at, 
+            m.created_at, 
+            (COALESCE(b.join_date, m.join_date))::TIMESTAMP, 
+            COALESCE(b.updated_at, m.updated_at)
+        ) AS created_at,
+        COALESCE(
+            b.updated_at, 
+            m.updated_at, 
+            COALESCE(b.created_at, m.created_at), 
+            (COALESCE(b.join_date, m.join_date))::TIMESTAMP
+        ) AS updated_at,
         ROW_NUMBER() OVER (
             PARTITION BY COALESCE(b.partner_id, m.partner_id)
             ORDER BY

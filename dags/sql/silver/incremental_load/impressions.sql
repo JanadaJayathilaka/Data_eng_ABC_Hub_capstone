@@ -4,15 +4,30 @@ WITH cleaned AS (
         NULLIF(TRIM(campaign_id), '') AS campaign_id,
         NULLIF(TRIM(creative_id), '') AS creative_id,
         pulsetrack_silver.parse_partner_id(partner_id) AS partner_id,
-        pulsetrack_silver.parse_timestamp(impression_time) AS impression_time,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(impression_time),
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(updated_at)
+        ) AS impression_time,
         pulsetrack_silver.parse_country(country) AS country,
         pulsetrack_silver.parse_device(device) AS device,
-        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(impression_time),
+            pulsetrack_silver.parse_timestamp(updated_at)
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(impression_time)
+        ) AS updated_at
 
     FROM pulsetrack_bronze.impressions
-    WHERE pulsetrack_silver.parse_timestamp(updated_at) > '{{ last_watermark }}'::TIMESTAMP
-       OR pulsetrack_silver.parse_timestamp(created_at) > '{{ last_watermark }}'::TIMESTAMP
+    WHERE COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(impression_time)
+        ) > '{{ last_watermark }}'::TIMESTAMP
 ),
 
 deduplicated AS (

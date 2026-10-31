@@ -9,9 +9,21 @@ WITH cleaned AS (
         NULLIF(TRIM(document->'payment'->>'terms'), '') AS payment_terms,
         pulsetrack_silver.parse_money(document->'payment'->>'min_payout') AS min_payout,
         LOWER(NULLIF(TRIM(document->'payment'->>'method'), '')) AS payment_method,
-        pulsetrack_silver.parse_date(COALESCE(document->'joinedAt'->>'$date', document->>'joinedAt')) AS joined_at,
-        pulsetrack_silver.parse_timestamp(COALESCE(document->'createdAt'->>'$date', document->>'createdAt')) AS created_at,
-        pulsetrack_silver.parse_timestamp(COALESCE(document->'updatedAt'->>'$date', document->>'updatedAt')) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_date(COALESCE(document->'joinedAt'->>'$date', document->>'joinedAt')),
+            (pulsetrack_silver.parse_timestamp(COALESCE(document->'createdAt'->>'$date', document->>'createdAt')))::DATE,
+            (pulsetrack_silver.parse_timestamp(COALESCE(document->'updatedAt'->>'$date', document->>'updatedAt')))::DATE
+        ) AS joined_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(COALESCE(document->'createdAt'->>'$date', document->>'createdAt')),
+            (pulsetrack_silver.parse_date(COALESCE(document->'joinedAt'->>'$date', document->>'joinedAt')))::TIMESTAMP,
+            pulsetrack_silver.parse_timestamp(COALESCE(document->'updatedAt'->>'$date', document->>'updatedAt'))
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(COALESCE(document->'updatedAt'->>'$date', document->>'updatedAt')),
+            pulsetrack_silver.parse_timestamp(COALESCE(document->'createdAt'->>'$date', document->>'createdAt')),
+            (pulsetrack_silver.parse_date(COALESCE(document->'joinedAt'->>'$date', document->>'joinedAt')))::TIMESTAMP
+        ) AS updated_at
     FROM pulsetrack_bronze.mongo_partner_profiles
 ),
 

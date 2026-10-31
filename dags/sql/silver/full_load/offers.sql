@@ -6,8 +6,14 @@ WITH cleaned AS (
         NULLIF(TRIM(vertical), '') AS vertical,
         pulsetrack_silver.parse_money(default_payout) AS default_payout,
         UPPER(NULLIF(TRIM(payout_type), '')) AS payout_type,
-        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(updated_at)
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at)
+        ) AS updated_at
 
     FROM pulsetrack_bronze.offers
 ),

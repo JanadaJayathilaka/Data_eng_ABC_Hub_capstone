@@ -31,10 +31,22 @@ cleaned AS (
         -- Standardize price_type to lowercase and trimmed ('cpa', 'cpc', 'cpm', 'fixed')
         LOWER(NULLIF(TRIM(c.price_type), '')) AS price_type,
 
-        pulsetrack_silver.parse_date(c.start_date) AS start_date,
+        COALESCE(
+            pulsetrack_silver.parse_date(c.start_date),
+            (pulsetrack_silver.parse_timestamp(c.created_at))::DATE,
+            (pulsetrack_silver.parse_timestamp(c.updated_at))::DATE
+        ) AS start_date,
         pulsetrack_silver.parse_date(c.end_date) AS end_date,
-        pulsetrack_silver.parse_timestamp(c.created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(c.updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(c.created_at),
+            (pulsetrack_silver.parse_date(c.start_date))::TIMESTAMP,
+            pulsetrack_silver.parse_timestamp(c.updated_at)
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(c.updated_at),
+            pulsetrack_silver.parse_timestamp(c.created_at),
+            (pulsetrack_silver.parse_date(c.start_date))::TIMESTAMP
+        ) AS updated_at
 
     FROM pulsetrack_bronze.campaigns c
     LEFT JOIN bronze_offers o 

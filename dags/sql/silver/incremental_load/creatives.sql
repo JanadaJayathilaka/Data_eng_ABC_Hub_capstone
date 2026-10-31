@@ -6,12 +6,20 @@ WITH cleaned AS (
         NULLIF(TRIM(format), '') AS format,
         NULLIF(TRIM(size), '') AS size,
         NULLIF(TRIM(landing_url), '') AS landing_url,
-        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(updated_at)
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at)
+        ) AS updated_at
 
     FROM pulsetrack_bronze.creatives
-    WHERE pulsetrack_silver.parse_timestamp(updated_at) > '{{ last_watermark }}'::TIMESTAMP
-       OR pulsetrack_silver.parse_timestamp(created_at) > '{{ last_watermark }}'::TIMESTAMP
+    WHERE COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at)
+        ) > '{{ last_watermark }}'::TIMESTAMP
 ),
 
 deduplicated AS (

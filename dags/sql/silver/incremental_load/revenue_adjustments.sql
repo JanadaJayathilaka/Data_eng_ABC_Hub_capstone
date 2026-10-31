@@ -4,13 +4,28 @@ WITH cleaned AS (
         NULLIF(TRIM(conversion_id), '') AS conversion_id,
         pulsetrack_silver.parse_money(delta_amount) AS delta_amount,
         NULLIF(TRIM(reason), '') AS reason,
-        pulsetrack_silver.parse_timestamp(adjusted_at) AS adjusted_at,
-        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(adjusted_at),
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(updated_at)
+        ) AS adjusted_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(adjusted_at),
+            pulsetrack_silver.parse_timestamp(updated_at)
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(adjusted_at)
+        ) AS updated_at
 
     FROM pulsetrack_bronze.revenue_adjustments
-    WHERE pulsetrack_silver.parse_timestamp(updated_at) > '{{ last_watermark }}'::TIMESTAMP
-       OR pulsetrack_silver.parse_timestamp(created_at) > '{{ last_watermark }}'::TIMESTAMP
+    WHERE COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(adjusted_at)
+        ) > '{{ last_watermark }}'::TIMESTAMP
 ),
 
 deduplicated AS (

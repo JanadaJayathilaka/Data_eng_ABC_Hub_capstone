@@ -5,12 +5,20 @@ WITH cleaned AS (
         NULLIF(TRIM(click_id), '') AS click_id,
         LOWER(NULLIF(TRIM(touch_position), '')) AS touch_position,
         pulsetrack_silver.parse_money(weight) AS weight,
-        pulsetrack_silver.parse_timestamp(created_at) AS created_at,
-        pulsetrack_silver.parse_timestamp(updated_at) AS updated_at
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(created_at),
+            pulsetrack_silver.parse_timestamp(updated_at)
+        ) AS created_at,
+        COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at)
+        ) AS updated_at
 
     FROM pulsetrack_bronze.conversion_touchpoints
-    WHERE pulsetrack_silver.parse_timestamp(updated_at) > '{{ last_watermark }}'::TIMESTAMP
-       OR pulsetrack_silver.parse_timestamp(created_at) > '{{ last_watermark }}'::TIMESTAMP
+    WHERE COALESCE(
+            pulsetrack_silver.parse_timestamp(updated_at),
+            pulsetrack_silver.parse_timestamp(created_at)
+        ) > '{{ last_watermark }}'::TIMESTAMP
 ),
 
 deduplicated AS (
