@@ -203,3 +203,10 @@ CREATE INDEX IF NOT EXISTS idx_fact_conversion_advertiser ON pulsetrack_gold.fac
 CREATE INDEX IF NOT EXISTS idx_fact_conversion_partner ON pulsetrack_gold.fact_conversion(partner_key);
 
 CREATE INDEX IF NOT EXISTS idx_bridge_click ON pulsetrack_gold.bridge_conversion_touchpoint(click_key);
+
+-- Unique business keys for idempotent incremental upserts
+CREATE UNIQUE INDEX IF NOT EXISTS uq_dim_geo_country ON pulsetrack_gold.dim_geo(country);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_dim_device_type_os_browser ON pulsetrack_gold.dim_device(device_type, operating_system, browser);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_impression_id ON pulsetrack_gold.fact_impression(impression_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_click_id ON pulsetrack_gold.fact_click(click_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_conversion_id ON pulsetrack_gold.fact_conversion(conversion_id);
