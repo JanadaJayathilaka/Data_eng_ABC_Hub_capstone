@@ -40,13 +40,48 @@ SQL_DIR = BASE_DIR / "sql" / "gold"
 
 
 # --------------------------------------------------------------------
-# Helper Task
+# Helper Tasks
 # --------------------------------------------------------------------
+
+def truncate_gold_layer():
+    """
+    Truncate all Gold tables atomically at the start of the full load pipeline.
+    Doing this in a single atomic transaction prevents concurrent CASCADE deadlocks
+    across parallel dimension and fact load tasks.
+    """
+    tables = [
+        "pulsetrack_gold.bridge_conversion_touchpoint",
+        "pulsetrack_gold.fact_conversion",
+        "pulsetrack_gold.fact_click",
+        "pulsetrack_gold.fact_impression",
+        "pulsetrack_gold.dim_creative",
+        "pulsetrack_gold.dim_campaign",
+        "pulsetrack_gold.dim_offer",
+        "pulsetrack_gold.dim_advertiser",
+        "pulsetrack_gold.dim_partner",
+        "pulsetrack_gold.dim_account_manager",
+        "pulsetrack_gold.dim_device",
+        "pulsetrack_gold.dim_geo",
+        "pulsetrack_gold.dim_date",
+    ]
+    conn = get_connection(TARGET_CONN)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE;")
+        conn.commit()
+        print("Successfully truncated all Gold layer tables.")
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        cursor.close()
+        conn.close()
+
 
 def load_gold_table(sql_file: str, target_table: str):
     """
     Generic full load function for Gold layer:
-    Reads transform SQL, truncates target table, and executes direct in-database ELT
+    Reads transform SQL and executes direct in-database ELT
     for maximum performance and transactional consistency.
     """
     sql = read_sql(SQL_DIR / sql_file)
@@ -55,10 +90,6 @@ def load_gold_table(sql_file: str, target_table: str):
     cursor = conn.cursor()
 
     try:
-        # Truncate existing data and reset surrogate keys
-        cursor.execute(f"TRUNCATE TABLE {target_table} RESTART IDENTITY CASCADE")
-
-        # Direct in-database ELT insert
         insert_sql = f"INSERT INTO {target_table} {sql}"
         cursor.execute(insert_sql)
         row_count = cursor.rowcount
@@ -95,6 +126,11 @@ with DAG(
 
     start = EmptyOperator(
         task_id="start"
+    )
+
+    truncate_gold = PythonOperator(
+        task_id="truncate_gold_layer",
+        python_callable=truncate_gold_layer,
     )
 
     # ----------------------------------------------------------------
@@ -233,8 +269,8 @@ with DAG(
     # ----------------------------------------------------------------
 
     # 1. Conformed dimension setup
-    # Independent dimensions start first
-    start >> [
+    # Truncate all tables first, then start independent dimensions in parallel
+    start >> truncate_gold >> [
         load_dim_date,
         load_dim_geo,
         load_dim_device,
