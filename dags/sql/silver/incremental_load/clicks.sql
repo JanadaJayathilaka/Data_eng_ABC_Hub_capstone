@@ -69,6 +69,23 @@ cleaned AS (
 
         pulsetrack_silver.parse_country(c.country) AS country,
         pulsetrack_silver.parse_device(c.device) AS device,
+        CASE
+            WHEN c.user_agent ILIKE '%Windows NT 10.0%' THEN 'Windows 10'
+            WHEN c.user_agent ILIKE '%Mac OS X%' OR c.user_agent ILIKE '%Macintosh%' THEN 'macOS'
+            WHEN c.user_agent ILIKE '%iPhone%' OR c.device ILIKE '%ios%' THEN 'iOS 16'
+            WHEN c.user_agent ILIKE '%Android%' OR c.device ILIKE '%android%' THEN 'Android 13'
+            WHEN c.device ILIKE '%tablet%' THEN 'Tablet OS'
+            ELSE 'Unknown'
+        END AS operating_system,
+        CASE
+            WHEN c.user_agent ILIKE '%iPhone%' THEN 'Mobile Safari'
+            WHEN c.user_agent ILIKE '%Macintosh%' OR c.user_agent ILIKE '%Mac OS X%' THEN 'Safari'
+            WHEN c.user_agent ILIKE '%Android%' OR c.user_agent ILIKE '%Linux%' THEN 'Chrome'
+            WHEN c.user_agent ILIKE '%Windows%' THEN 'Edge / Chrome'
+            WHEN c.user_agent ILIKE '%curl%' THEN 'cURL'
+            WHEN c.user_agent ILIKE '%bot%' THEN 'Crawler'
+            ELSE 'Unknown'
+        END AS browser,
         pulsetrack_silver.parse_boolean(c.is_unique) AS is_unique,
         COALESCE(
             pulsetrack_silver.parse_timestamp(c.created_at),
@@ -125,6 +142,8 @@ SELECT
     click_time,
     country,
     device,
+    operating_system,
+    browser,
     is_unique,
     created_at,
     updated_at

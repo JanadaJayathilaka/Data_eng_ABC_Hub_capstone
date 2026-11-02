@@ -322,6 +322,8 @@ CREATE TABLE IF NOT EXISTS pulsetrack_silver.clicks (
     click_time      TIMESTAMP,
     country         VARCHAR(10),
     device          VARCHAR(20),
+    operating_system VARCHAR(50),
+    browser         VARCHAR(50),
     is_unique       BOOLEAN,
     created_at      TIMESTAMP,
     updated_at      TIMESTAMP
