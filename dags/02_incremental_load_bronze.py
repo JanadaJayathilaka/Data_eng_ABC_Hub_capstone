@@ -152,6 +152,7 @@ with DAG(
     catchup=False,
     default_args=default_args,
     max_active_runs=1,
+    max_active_tasks=4,
     tags=["pulsetrack", "bronze", "incremental", "medallion"],
 ) as dag:
 
